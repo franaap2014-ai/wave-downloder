@@ -39,7 +39,7 @@ function render(){
   $('links').placeholder=({youtube:'https://www.youtube.com/watch?v=...',instagram:'https://www.instagram.com/reel/.../',tiktok:'https://www.tiktok.com/@usuario/video/...'}[state.platform]||'');
   $('linkType').textContent=state.mode==='playlist'?'PLAYLIST':'VÍDEO';
   $('examples').classList.toggle('hidden',state.platform!=='youtube');
-  $('linkHelp').textContent=state.mode==='playlist' ? 'Apenas playlist do YouTube, até '+(state.media_format==='mp3'?20:8)+' itens, dentro de ZIP.' : 'Vídeo público de sua autoria ou com autorização. Instagram/TikTok podem exigir login, que este site não fornece.';
+  $('linkHelp').textContent=(state.mode==='playlist' ? 'Apenas playlist do YouTube, até '+(state.media_format==='mp3'?20:8)+' itens, dentro de ZIP.' : 'Vídeo público de sua autoria ou com autorização. Instagram/TikTok podem exigir login, que este site não fornece.') + (state.platform==='youtube' ? ' Atenção: o YouTube pode exigir verificação do servidor e bloquear a solicitação.' : '');
   $('convertBtn').textContent=(!state.authorized?'🔒 Entrar para continuar':state.mode==='playlist'?'↓ Baixar playlist em ZIP':'↓ Baixar '+state.media_format.toUpperCase());
   $('convertBtn').disabled=state.busy;
 }
