@@ -40,6 +40,16 @@
       <div class="form-separator"></div>
       <div class="section-top"><div><span class="section-kicker">ETAPA 03 · CONFIGURAÇÕES</span><h2>Configure seu download</h2></div></div>
       <div class="main-form">
+        <div class="source-switch" id="sourceSwitch" role="group" aria-label="Escolha a origem da mídia">
+          <button type="button" id="sourceLink" class="source-option selected" aria-pressed="true">🔗 Usar link</button>
+          <button type="button" id="sourceUpload" class="source-option" aria-pressed="false">⬆ Enviar arquivo próprio</button>
+        </div>
+        <div class="platform-note hidden" id="youtubeServerNote" role="note">
+          <strong>Aviso sobre o YouTube:</strong> algumas conexões do Render podem ser bloqueadas pela verificação automática do YouTube.
+          Se isso acontecer, escolha <strong>Enviar arquivo próprio</strong> para converter um vídeo ou áudio que você já possui.
+          Para baixar vídeos que você publicou, consulte o <a href="https://studio.youtube.com/" target="_blank" rel="noopener noreferrer">YouTube Studio</a>.
+          Não envie senhas nem cookies da sua conta.
+        </div>
         <div class="mode-tiles" id="modeRow" role="group" aria-label="Tipo de mídia">
           <button type="button" id="videoMode" class="tile selected" aria-pressed="true"><span class="tile-icon">▶</span><strong>Baixar um vídeo</strong><small id="videoDescription">Em MP3</small></button>
           <button type="button" id="playlistMode" class="tile" aria-pressed="false"><span class="tile-icon">☷</span><strong>Playlist completa</strong><small>Arquivos em pasta dentro de ZIP</small></button>
@@ -50,7 +60,7 @@
           <p id="linkHelp" class="hint">Cole um link de vídeo público que você tem permissão para baixar.</p>
           <div class="example-row" id="examples"><span>Links anteriores:</span><button type="button" class="example-link" id="example1">Exemplo 1</button><button type="button" class="example-link" id="example2">Exemplo 2</button></div>
         </div>
-        <div class="field hidden" id="uploadPanel"><label for="uploadFile">Seu arquivo de áudio ou vídeo</label><input id="uploadFile" type="file" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.mp4,.mov,.webm,audio/*,video/*"><p class="hint">Até 85 MB. Sem DRM. Conversão de arquivos que você possui legalmente.</p></div>
+        <div class="field hidden" id="uploadPanel"><label for="uploadFile">Escolha um arquivo de áudio ou vídeo seu</label><input id="uploadFile" type="file" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.mp4,.mov,.webm,audio/*,video/*"><p class="hint">Até 85 MB: MP3, M4A, AAC, WAV, FLAC, OGG, MP4, MOV ou WEBM. Sem DRM. Use apenas arquivos próprios ou autorizados.</p></div>
         <div class="field" id="mp3Quality"><label>Qualidade do áudio</label>
           <div class="quality-grid" role="radiogroup" aria-label="Qualidade MP3">
             <label class="quality"><input type="radio" name="mp3Quality" value="128"><span><strong>128 kbps</strong><small>Mais leve</small></span></label>
