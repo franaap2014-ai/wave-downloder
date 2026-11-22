@@ -52,6 +52,8 @@ lock = threading.RLock()
 active_job: str | None = None
 recent_jobs: deque[float] = deque()
 login_attempts: dict[str, deque[float]] = {}
+recent_diagnostics: deque[float] = deque()
+diagnostic_busy = False
 
 
 def safe_name(value: str, fallback: str = 'Mídia') -> str:
@@ -121,6 +123,113 @@ def normalized_link(raw: str, platform: str = 'youtube', playlist: bool = False)
     if platform == 'spotify':
         raise ValueError('Links do Spotify não podem ser exportados como MP3/MP4. Use um arquivo seu na opção "Arquivo próprio".')
     raise ValueError('Plataforma não reconhecida.')
+
+
+
+# Mensagens públicas não expõem URL, cookies, cabeçalhos ou respostas brutas.
+DIAGNOSTIC_MESSAGES = {
+    'verification_required': 'O YouTube exigiu verificação desta conexão. Não é possível concluir apenas com essa mensagem se o problema é do IP, da sessão ou da política de acesso.',
+    'rate_limited': 'O YouTube respondeu com limite de requisições (429). Isso não comprova bloqueio permanente do IP.',
+    'forbidden': 'O YouTube recusou o acesso (403). Pode ser restrição do recurso, cliente ou conexão; o código sozinho não identifica a causa.',
+    'extractor_signature': 'O extrator relatou dificuldade com a assinatura do vídeo. Verifique a versão do yt-dlp e os avisos de compatibilidade.',
+    'private_or_unavailable': 'O vídeo não está disponível publicamente para esta conexão.',
+    'network_error': 'Falha de rede ou tempo esgotado durante a consulta ao YouTube.',
+    'no_formats': 'Os metadados foram obtidos, mas não há formatos utilizáveis. Pode haver restrições adicionais.',
+    'ok': 'Metadados e formatos disponíveis nesta consulta. Isso não garante que o download do arquivo funcionará.',
+    'unknown': 'Não foi possível determinar a causa da falha de extração pelos sinais observados.',
+}
+
+
+def classify_youtube_diagnostic(raw: str) -> str:
+    """Classifica sinais observáveis sem inferir reputação do ASN ou burlas."""
+    msg = str(raw).lower()
+    if any(mark in msg for mark in ('sign in to confirm', 'not a bot', 'login_required', 'confirm you’re not a bot')):
+        return 'verification_required'
+    if any(mark in msg for mark in ('http error 429', 'status code 429', 'too many requests')):
+        return 'rate_limited'
+    if any(mark in msg for mark in ('signature extraction failed', 'nsig extraction failed', 'signature decipher')):
+        return 'extractor_signature'
+    if any(mark in msg for mark in ('http error 403', 'status code 403', '403 forbidden')):
+        return 'forbidden'
+    if any(mark in msg for mark in ('private video', 'video unavailable', 'this video is unavailable', 'video is not available')):
+        return 'private_or_unavailable'
+    if any(mark in msg for mark in ('timed out', 'timeout', 'connection reset', 'network is unreachable', 'name resolution')):
+        return 'network_error'
+    return 'unknown'
+
+
+class _PrivateYtdlpLogger:
+    """Recebe a saída verbose, mas não a grava nem a publica: somente a categoria."""
+    def __init__(self):
+        self.lines = []
+
+    def _collect(self, message):
+        if len(self.lines) < 120:
+            self.lines.append(str(message)[:300])
+
+    def debug(self, message):
+        self._collect(message)
+
+    def warning(self, message):
+        self._collect(message)
+
+    def error(self, message):
+        self._collect(message)
+
+
+@app.post('/api/diagnose')
+@requires_auth
+def diagnose_youtube():
+    """Sonda metadados de UM vídeo público por vez; não baixa nem muda de cliente."""
+    global diagnostic_busy
+    if request.content_length and request.content_length > 12000:
+        return jsonify(error='Pedido muito grande.'), 413
+    data = request.get_json(silent=True) or {}
+    if data.get('permission') is not True:
+        return jsonify(error='Confirme a autorização para consultar o vídeo.'), 400
+    try:
+        link = normalized_link(data.get('url'), 'youtube', False)
+    except (TypeError, ValueError) as exc:
+        return jsonify(error=str(exc)), 400
+    now = time.time()
+    with lock:
+        while recent_diagnostics and recent_diagnostics[0] < now - 3600:
+            recent_diagnostics.popleft()
+        if diagnostic_busy or (active_job and jobs.get(active_job, {}).get('status') in {'queued', 'running'}):
+            return jsonify(error='O servidor está ocupado. Tente novamente quando concluir.'), 429
+        if len(recent_diagnostics) >= 3:
+            return jsonify(error='Limite de três diagnósticos por hora atingido.'), 429
+        recent_diagnostics.append(now)
+        diagnostic_busy = True
+    collector = _PrivateYtdlpLogger()
+    code = 'unknown'
+    version = 'desconhecida'
+    try:
+        import yt_dlp
+        version = str(yt_dlp.version.__version__)
+        opts = {
+            'logger': collector,
+            'verbose': True,
+            'quiet': True,
+            'no_warnings': False,
+            'simulate': True,
+            'skip_download': True,
+            'noplaylist': True,
+            'socket_timeout': 10,
+            'retries': 0,
+            'extractor_retries': 0,
+            'fragment_retries': 0,
+        }
+        with yt_dlp.YoutubeDL(opts) as downloader:
+            info = downloader.extract_info(link, download=False)
+        code = 'ok' if isinstance(info, dict) and info.get('formats') else 'no_formats'
+    except Exception as exc:
+        code = classify_youtube_diagnostic(str(exc) + '\n' + '\n'.join(collector.lines))
+    finally:
+        with lock:
+            diagnostic_busy = False
+    app.logger.info('Diagnóstico YouTube: categoria=%s; versão yt-dlp=%s', code, version)
+    return jsonify(code=code, message=DIAGNOSTIC_MESSAGES[code], yt_dlp_version=version)
 
 
 def log_job(job: dict) -> None:
@@ -363,13 +472,9 @@ def process_job(jid: str) -> None:
                 'cookies-from-browser', 'confirm you\u2019re not a bot'
             )
         )
-        if youtube_verification:
-            public_error = (
-                'O YouTube exigiu uma verificação para esta conexão do servidor '
-                'e bloqueou o acesso ao vídeo. Não é um erro de MP3 ou MP4. '
-                'Você pode converter um arquivo próprio ou utilizar as opções oficiais '
-                'de download do YouTube.'
-            )
+        if job['platform'] == 'youtube':
+            category = classify_youtube_diagnostic(raw_error)
+            public_error = DIAGNOSTIC_MESSAGES[category]
         else:
             public_error = raw_error[:220]
         app.logger.warning(
