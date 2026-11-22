@@ -353,10 +353,32 @@ def process_job(jid: str) -> None:
             job.update(status='done', progress=100, message='Arquivo pronto para baixar!', filename=final.name,
                        final_path=str(final), finished_at=datetime.now(timezone.utc))
     except Exception as exc:
-        app.logger.warning('Falha no processamento (%s)', type(exc).__name__)
+        # Descreve recusas do serviço sem sugerir que o usuário compartilhe
+        # cookies de sessão ou outras credenciais de sua conta Google.
+        raw_error = str(exc)
+        lowered = raw_error.lower()
+        youtube_verification = job['platform'] == 'youtube' and any(
+            phrase in lowered for phrase in (
+                'sign in to confirm', 'not a bot', 'login_required',
+                'cookies-from-browser', 'confirm you\u2019re not a bot'
+            )
+        )
+        if youtube_verification:
+            public_error = (
+                'O YouTube exigiu uma verificação para esta conexão do servidor '
+                'e bloqueou o acesso ao vídeo. Não é um erro de MP3 ou MP4. '
+                'Você pode converter um arquivo próprio ou utilizar as opções oficiais '
+                'de download do YouTube.'
+            )
+        else:
+            public_error = raw_error[:220]
+        app.logger.warning(
+            'Falha no processamento (%s; verificacao_youtube=%s)',
+            type(exc).__name__, youtube_verification
+        )
         with lock:
             job.update(status='error', message='Não foi possível preparar este arquivo.',
-                       error=str(exc)[:220], finished_at=datetime.now(timezone.utc))
+                       error=public_error, finished_at=datetime.now(timezone.utc))
         shutil.rmtree(folder, ignore_errors=True)
     finally:
         with lock:
