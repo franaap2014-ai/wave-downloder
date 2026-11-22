@@ -58,6 +58,11 @@
           <div class="label-line"><label for="links">Link do <span id="platformName">YouTube</span></label><span id="linkType">VÍDEO</span></div>
           <input id="links" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="https://www.youtube.com/watch?v=..." maxlength="600">
           <p id="linkHelp" class="hint">Cole um link de vídeo público que você tem permissão para baixar.</p>
+          <div id="youtubeDiagnostic" class="diagnostic-box">
+            <button type="button" class="diagnostic-button" id="diagnosticBtn">🔎 Diagnosticar link sem baixar</button>
+            <p class="hint">Confere somente metadados do YouTube, com limite de 3 testes por hora. Não solicita cookies nem senhas.</p>
+            <p id="diagnosticResult" class="diagnostic-result hidden" role="status" aria-live="polite"></p>
+          </div>
           <div class="example-row" id="examples"><span>Links anteriores:</span><button type="button" class="example-link" id="example1">Exemplo 1</button><button type="button" class="example-link" id="example2">Exemplo 2</button></div>
         </div>
         <div class="field hidden" id="uploadPanel"><label for="uploadFile">Escolha um arquivo de áudio ou vídeo seu</label><input id="uploadFile" type="file" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.mp4,.mov,.webm,audio/*,video/*"><p class="hint">Até 85 MB: MP3, M4A, AAC, WAV, FLAC, OGG, MP4, MOV ou WEBM. Sem DRM. Use apenas arquivos próprios ou autorizados.</p></div>
