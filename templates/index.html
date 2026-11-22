@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#090e1e">
+  <meta name="description" content="Wave Downloder: organize suas mídias próprias/autorizadas em MP3, MP4 ou ZIP de playlists.">
+  <title>Wave Downloder — MP3 e MP4</title>
+  <link rel="stylesheet" href="/static/style.css">
+  <script src="/static/app.js" defer></script>
+</head>
+<body>
+  <div class="glow glow-1" aria-hidden="true"></div><div class="glow glow-2" aria-hidden="true"></div>
+  <header class="header">
+    <a class="logo" href="/" aria-label="Página inicial Wave Downloder"><span class="logo-symbol" aria-hidden="true">≋</span><span>Wave <em>Downloder</em></span></a>
+    <div class="nav-caption">MEDIA STUDIO <span class="online-dot" aria-hidden="true"></span><button type="button" class="signout hidden" id="logoutBtn">Sair</button></div>
+  </header>
+  <main>
+    <section class="hero" aria-label="Apresentação">
+      <span class="eyebrow"><span class="eyebrow-dot"></span> CONVERSOR MULTIPLATAFORMA</span>
+      <h1>Transforme em <span>MP3 ou MP4</span></h1>
+      <p>Escolha um formato, selecione a plataforma e organize seus conteúdos com permissão para download.</p>
+    </section>
+
+    <section class="panel converter" id="converter" aria-label="Configurações de conversão">
+      <div class="section-top"><div><span class="section-kicker">ETAPA 01 · FORMATO</span><h2>Primeiro, escolha MP3 ou MP4</h2></div><span class="section-icon" aria-hidden="true">◈</span></div>
+      <div class="format-grid" role="group" aria-label="Formato do arquivo">
+        <button type="button" id="formatMp3" class="format-choice selected" aria-pressed="true"><span class="format-logo">♫</span><span><strong>MP3</strong><small>Som e música</small></span></button>
+        <button type="button" id="formatMp4" class="format-choice" aria-pressed="false"><span class="format-logo">▣</span><span><strong>MP4</strong><small>Vídeo com áudio</small></span></button>
+      </div>
+      <div class="form-separator"></div>
+      <div class="section-top"><div><span class="section-kicker">ETAPA 02 · ORIGEM</span><h2>Selecione a plataforma</h2></div></div>
+      <div class="platform-grid" role="group" aria-label="Plataforma do conteúdo">
+        <button type="button" class="platform-choice selected" data-platform="youtube" aria-pressed="true"><span class="platform-logo youtube">▶</span><strong>YouTube</strong></button>
+        <button type="button" class="platform-choice" data-platform="spotify" aria-pressed="false"><span class="platform-logo spotify">◉</span><strong>Spotify</strong><small>Arquivo próprio</small></button>
+        <button type="button" class="platform-choice" data-platform="instagram" aria-pressed="false"><span class="platform-logo instagram">◎</span><strong>Instagram</strong></button>
+        <button type="button" class="platform-choice" data-platform="tiktok" aria-pressed="false"><span class="platform-logo tiktok">♪</span><strong>TikTok</strong></button>
+      </div>
+      <div class="platform-note hidden" id="spotifyNote" role="note">O Spotify não disponibiliza músicas de streaming para exportação em MP3 ou MP4 por terceiros. Nesta opção, você pode converter um <strong>arquivo seu</strong> que já possua legalmente, sem retirar proteção digital.</div>
+      <div class="form-separator"></div>
+      <div class="section-top"><div><span class="section-kicker">ETAPA 03 · CONFIGURAÇÕES</span><h2>Configure seu download</h2></div></div>
+      <div class="main-form">
+        <div class="mode-tiles" id="modeRow" role="group" aria-label="Tipo de mídia">
+          <button type="button" id="videoMode" class="tile selected" aria-pressed="true"><span class="tile-icon">▶</span><strong>Baixar um vídeo</strong><small id="videoDescription">Em MP3</small></button>
+          <button type="button" id="playlistMode" class="tile" aria-pressed="false"><span class="tile-icon">☷</span><strong>Playlist completa</strong><small>Arquivos em pasta dentro de ZIP</small></button>
+        </div>
+        <div class="field" id="urlPanel">
+          <div class="label-line"><label for="links">Link do <span id="platformName">YouTube</span></label><span id="linkType">VÍDEO</span></div>
+          <input id="links" type="url" inputmode="url" spellcheck="false" autocomplete="off" placeholder="https://www.youtube.com/watch?v=..." maxlength="600">
+          <p id="linkHelp" class="hint">Cole um link de vídeo público que você tem permissão para baixar.</p>
+          <div class="example-row" id="examples"><span>Links anteriores:</span><button type="button" class="example-link" id="example1">Exemplo 1</button><button type="button" class="example-link" id="example2">Exemplo 2</button></div>
+        </div>
+        <div class="field hidden" id="uploadPanel"><label for="uploadFile">Seu arquivo de áudio ou vídeo</label><input id="uploadFile" type="file" accept=".mp3,.m4a,.aac,.wav,.flac,.ogg,.mp4,.mov,.webm,audio/*,video/*"><p class="hint">Até 85 MB. Sem DRM. Conversão de arquivos que você possui legalmente.</p></div>
+        <div class="field" id="mp3Quality"><label>Qualidade do áudio</label>
+          <div class="quality-grid" role="radiogroup" aria-label="Qualidade MP3">
+            <label class="quality"><input type="radio" name="mp3Quality" value="128"><span><strong>128 kbps</strong><small>Mais leve</small></span></label>
+            <label class="quality"><input type="radio" name="mp3Quality" value="192" checked><span><strong>192 kbps</strong><small>Equilibrada</small></span></label>
+            <label class="quality"><input type="radio" name="mp3Quality" value="320"><span><strong>320 kbps</strong><small>Maior bitrate</small></span></label>
+          </div>
+        </div>
+        <div class="field hidden" id="mp4Quality"><label>Resolução do vídeo</label>
+          <div class="quality-grid" role="radiogroup" aria-label="Resolução MP4">
+            <label class="quality"><input type="radio" name="mp4Quality" value="360"><span><strong>360p</strong><small>Mais leve</small></span></label>
+            <label class="quality"><input type="radio" name="mp4Quality" value="720" checked><span><strong>720p</strong><small>HD</small></span></label>
+            <label class="quality"><input type="radio" name="mp4Quality" value="1080"><span><strong>1080p</strong><small>Full HD</small></span></label>
+          </div>
+        </div>
+        <label class="permission"><input type="checkbox" id="permission"><span>Confirmo que este material é meu ou que tenho permissão para obter uma cópia e respeitarei os termos da plataforma.</span></label>
+        <div id="notice" class="notice hidden" role="status"></div>
+        <button type="button" class="action large" id="convertBtn">↓ Baixar em MP3</button>
+        <div class="progress-panel hidden" id="progressPanel" role="status" aria-live="polite">
+          <div class="progress-heading"><strong id="statusTitle">Preparando...</strong><span id="progressPercent">0%</span></div>
+          <div class="track"><div id="progressFill" class="track-fill"></div></div>
+          <p id="statusText">Aguardando o servidor...</p>
+          <a id="downloadBtn" class="action large download hidden" href="#" download>↓ Salvar arquivo</a>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel auth-panel" id="loginCard" aria-label="Entrar para baixar">
+      <div class="panel-head"><span class="panel-icon" aria-hidden="true">🔒</span><div><h2>Área protegida</h2><p>O site é público, mas para processar arquivos você precisa da senha de acesso.</p></div></div>
+      <form id="loginForm"><label for="sitePassword">Senha de acesso</label><div class="login-row"><input type="password" id="sitePassword" autocomplete="current-password" placeholder="Senha do site" minlength="8" maxlength="200" required><button class="action" type="submit">Entrar</button></div></form>
+      <div id="loginNotice" class="notice hidden" role="status"></div>
+    </section>
+
+    <div class="details"><div class="detail"><span>♫</span><strong>MP3</strong><small>128, 192 e 320 kbps</small></div><div class="detail"><span>▣</span><strong>MP4</strong><small>360p, 720p e 1080p</small></div><div class="detail"><span>▤</span><strong>ZIP organizado</strong><small>Playlists do YouTube</small></div></div>
+    <footer>Wave Downloder • Apenas conteúdos próprios ou autorizados • Sem contornar DRM ou acesso privado</footer>
+  </main>
+</body>
+</html>
