@@ -177,6 +177,48 @@ class _PrivateYtdlpLogger:
         self._collect(message)
 
 
+def log_job(job: dict) -> None:
+    """Metadata only: never store media, page URLs, passwords, IPs or cookies in Neon."""
+    if not DATABASE_URL:
+        return
+    try:
+        import psycopg
+        with psycopg.connect(DATABASE_URL, connect_timeout=5) as conn:
+            with conn.cursor() as cur:
+                cur.execute('''INSERT INTO download_jobs
+                     (job_id, mode, status, source_count, output_count, finished_at,
+                      error_message, platform, media_format)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                     ON CONFLICT (job_id) DO UPDATE SET
+                       status=EXCLUDED.status, output_count=EXCLUDED.output_count,
+                       finished_at=EXCLUDED.finished_at, error_message=EXCLUDED.error_message''',
+                    (job['id'], job['mode'], job['status'], job['source_count'],
+                     job['output_count'], job.get('finished_at'), job.get('error'),
+                     job['platform'], job['media_format']))
+    except Exception as exc:
+        app.logger.warning('Histórico do Neon indisponível (%s)', type(exc).__name__)
+
+
+def prune() -> None:
+    cutoff = time.time() - JOB_TTL_SECONDS
+    with lock:
+        for jid, job in list(jobs.items()):
+            if job['created_ts'] < cutoff and job['status'] in {'done', 'error'}:
+                shutil.rmtree(job['directory'], ignore_errors=True)
+                del jobs[jid]
+        while recent_jobs and recent_jobs[0] < time.time() - 3600:
+            recent_jobs.popleft()
+
+
+def requires_auth(fn):
+    @wraps(fn)
+    def wrapper(*args, **kwargs):
+        if not session.get('authorized'):
+            return jsonify(error='Faça login para acessar a conversão.'), 401
+        return fn(*args, **kwargs)
+    return wrapper
+
+
 @app.post('/api/diagnose')
 @requires_auth
 def diagnose_youtube():
@@ -230,48 +272,6 @@ def diagnose_youtube():
             diagnostic_busy = False
     app.logger.info('Diagnóstico YouTube: categoria=%s; versão yt-dlp=%s', code, version)
     return jsonify(code=code, message=DIAGNOSTIC_MESSAGES[code], yt_dlp_version=version)
-
-
-def log_job(job: dict) -> None:
-    """Metadata only: never store media, page URLs, passwords, IPs or cookies in Neon."""
-    if not DATABASE_URL:
-        return
-    try:
-        import psycopg
-        with psycopg.connect(DATABASE_URL, connect_timeout=5) as conn:
-            with conn.cursor() as cur:
-                cur.execute('''INSERT INTO download_jobs
-                     (job_id, mode, status, source_count, output_count, finished_at,
-                      error_message, platform, media_format)
-                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
-                     ON CONFLICT (job_id) DO UPDATE SET
-                       status=EXCLUDED.status, output_count=EXCLUDED.output_count,
-                       finished_at=EXCLUDED.finished_at, error_message=EXCLUDED.error_message''',
-                    (job['id'], job['mode'], job['status'], job['source_count'],
-                     job['output_count'], job.get('finished_at'), job.get('error'),
-                     job['platform'], job['media_format']))
-    except Exception as exc:
-        app.logger.warning('Histórico do Neon indisponível (%s)', type(exc).__name__)
-
-
-def prune() -> None:
-    cutoff = time.time() - JOB_TTL_SECONDS
-    with lock:
-        for jid, job in list(jobs.items()):
-            if job['created_ts'] < cutoff and job['status'] in {'done', 'error'}:
-                shutil.rmtree(job['directory'], ignore_errors=True)
-                del jobs[jid]
-        while recent_jobs and recent_jobs[0] < time.time() - 3600:
-            recent_jobs.popleft()
-
-
-def requires_auth(fn):
-    @wraps(fn)
-    def wrapper(*args, **kwargs):
-        if not session.get('authorized'):
-            return jsonify(error='Faça login para acessar a conversão.'), 401
-        return fn(*args, **kwargs)
-    return wrapper
 
 
 @app.get('/')
