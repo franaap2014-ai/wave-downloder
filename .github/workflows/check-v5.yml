@@ -1,0 +1,25 @@
+name: Testar Wave Downloder V5
+on:
+  push:
+    branches: [main]
+    paths: ['app.py', 'templates/**', 'static/**', 'windows/**', 'tests/**', '.github/workflows/check-v5.yml']
+  workflow_dispatch:
+jobs:
+  verificacao:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Verificar sintaxe Python e JavaScript
+        run: |
+          python -m py_compile app.py
+          node --check static/app.js
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+      - name: Testar pareamento, fila e arquivo
+        run: python -m unittest discover -s tests -v
