@@ -1,0 +1,14 @@
+# Wave Downloder V5 - Integracao Windows + Site
+O site tem dois motores: Render (Linux) e a V4 no PC (Windows).
+Para usar a V4 pelo site:
+1. Extraia a V4 e copie Ponte_Wave.ps1 e INICIAR_PONTE_WEB.bat para a mesma pasta dos quatro executaveis.
+2. Acesse https://wave-downloder.onrender.com e entre com a senha do site.
+3. Na opcao "Meu Windows V4", clique "Gerar codigo para conectar meu PC".
+4. Inicie INICIAR_PONTE_WEB.bat e cole o codigo.
+5. Mantenha o Windows ligado. Escolha MP3/MP4, cole um link autorizado e processe pelo site.
+O programa usa conexao de saida HTTPS ao Render. Nao precisa abrir portas nem configurar o roteador.
+Nao compartilhe o codigo: ele da acesso ao processamento de tarefas.
+A ponte usa memoria temporaria no Render; um restart do servidor pode exigir novo pareamento.
+Arquivos enviados para o site ficam disponiveis ate 30 minutos; o servidor limita a 85 MB por resultado.
+O modo servidor pode continuar bloqueado por verificacao exigida pelo YouTube; a ponte nao contorna verificacoes do YouTube.
+A conexao do PC precisa ter acesso autorizado ao arquivo. Nao forneca cookies ou credenciais de sites.

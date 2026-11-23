@@ -1,17 +1,28 @@
 'use strict';
 const $ = id => document.getElementById(id);
 const defaults = {
-  youtube: 'https://www.youtube.com/watch?v=mukiMaOSLEs&list=PL3817D41C7D841E23&index=2',
+  youtube: '',
   instagram: '', tiktok: '', spotify: ''
 };
 const example2 = 'https://www.youtube.com/watch?v=aLf9lfbI5Kg';
-const state = {media_format: 'mp3', platform: 'youtube', mode: 'videos', source: 'link', authorized: false, busy: false, diagnosticBusy: false, timer: null, drafts: {...defaults}};
+const state = {media_format: 'mp3', platform: 'youtube', mode: 'videos', source: 'link', engine: 'server', bridgeConnected: false, authorized: false, busy: false, diagnosticBusy: false, timer: null, drafts: {...defaults}};
 const platformNames = {youtube:'YouTube',instagram:'Instagram',tiktok:'TikTok',spotify:'Spotify'};
 function message(text, id = 'notice', success = false) { const n=$(id); n.textContent=text;n.classList.remove('hidden');n.classList.toggle('success',success); }
 function clear(id='notice') { $(id).classList.add('hidden'); }
-function authorized(flag){ state.authorized=flag; $('loginCard').classList.toggle('hidden',flag);$('logoutBtn').classList.toggle('hidden',!flag);render(); }
+function authorized(flag){ state.authorized=flag; $('loginCard').classList.toggle('hidden',flag);$('logoutBtn').classList.toggle('hidden',!flag);if(flag)updateBridgeStatus();else{state.bridgeConnected=false;$('bridgeTokenWrap').classList.add('hidden');}render(); }
 function render(){
   const uploadMode=state.source==='upload' || state.platform==='spotify';
+  $('engineSection').classList.toggle('hidden', uploadMode);
+  $('engineServer').classList.toggle('selected',state.engine==='server');
+  $('enginePc').classList.toggle('selected',state.engine==='bridge');
+  $('engineServer').setAttribute('aria-pressed',String(state.engine==='server'));
+  $('enginePc').setAttribute('aria-pressed',String(state.engine==='bridge'));
+  $('engineServer').disabled=state.busy;
+  $('enginePc').disabled=state.busy;
+  $('bridgeCard').classList.toggle('hidden',uploadMode || state.engine!=='bridge');
+  $('bridgeStatus').textContent=state.bridgeConnected?'Windows conectado':'Windows desconectado';
+  $('bridgeStatus').classList.toggle('connected',state.bridgeConnected);
+  $('bridgePairBtn').disabled=state.busy || !state.authorized;
   $('formatMp3').classList.toggle('selected',state.media_format==='mp3');
   $('formatMp4').classList.toggle('selected',state.media_format==='mp4');
   $('formatMp3').setAttribute('aria-pressed',String(state.media_format==='mp3'));
@@ -51,8 +62,14 @@ function render(){
   $('linkType').textContent=state.mode==='playlist'?'PLAYLIST':'VÍDEO';
   $('examples').classList.toggle('hidden',state.platform!=='youtube');
   $('linkHelp').textContent=(state.mode==='playlist' ? 'Apenas playlist do YouTube, até '+(state.media_format==='mp3'?20:8)+' itens, dentro de ZIP.' : 'Vídeo público de sua autoria ou com autorização. Instagram/TikTok podem exigir login, que este site não fornece.') + (state.platform==='youtube' ? ' Atenção: o YouTube pode exigir verificação do servidor e bloquear a solicitação.' : '');
-  $('convertBtn').textContent=(!state.authorized?'🔒 Entrar para continuar':uploadMode?'↑ Converter meu arquivo em '+state.media_format.toUpperCase():state.mode==='playlist'?'↓ Baixar playlist em ZIP':'↓ Baixar '+state.media_format.toUpperCase());
+  $('convertBtn').textContent=(!state.authorized?'🔒 Entrar para continuar':uploadMode?'↑ Converter meu arquivo em '+state.media_format.toUpperCase():state.engine==='bridge'?'↓ Processar no meu Windows V4':state.mode==='playlist'?'↓ Baixar playlist em ZIP':'↓ Baixar '+state.media_format.toUpperCase());
   $('convertBtn').disabled=state.busy || state.diagnosticBusy;
+}
+function chooseEngine(engine){if(state.busy)return;state.engine=engine;clear();render();}
+async function updateBridgeStatus(){
+  if(!state.authorized)return;
+  try{const r=await api('/api/bridge/status');state.bridgeConnected=!!r.connected;$('bridgeInfo').textContent=r.connected?'Conectado: pronto para receber tarefas.':'Abra a ponte no Windows e cole o codigo para conectar.';render();}
+  catch(_){state.bridgeConnected=false;render();}
 }
 function choosePlatform(platform){
   if (state.busy || state.platform===platform)return;
@@ -97,6 +114,15 @@ $('loginForm').addEventListener('submit',async e=>{
   catch(e){message(e.message,'loginNotice');}
 });
 $('logoutBtn').addEventListener('click',async()=>{if(state.timer)clearTimeout(state.timer);try{await api('/api/logout',{method:'POST'});}catch(_){}authorized(false);});
+$('engineServer').addEventListener('click',()=>chooseEngine('server'));
+$('enginePc').addEventListener('click',()=>chooseEngine('bridge'));
+$('bridgePairBtn').addEventListener('click',async()=>{
+  if(!state.authorized)return $('loginCard').scrollIntoView({behavior:'smooth'});
+  try{const r=await api('/api/bridge/pair',{method:'POST',body:'{}'});$('bridgeToken').textContent=r.token;$('bridgeTokenWrap').classList.remove('hidden');state.bridgeConnected=false;render();message('Novo codigo criado. Abra INICIAR_PONTE_WEB.bat no Windows e cole-o.','notice',true);}
+  catch(e){message(e.message);}
+});
+$('bridgeCopyBtn').addEventListener('click',async()=>{try{await navigator.clipboard.writeText($('bridgeToken').textContent);$('bridgeCopyBtn').textContent='Copiado!';}catch(_){message('Selecione o codigo e copie com Ctrl+C.');}});
+setInterval(updateBridgeStatus,12000);
 $('formatMp3').addEventListener('click',()=>chooseFormat('mp3'));
 $('formatMp4').addEventListener('click',()=>chooseFormat('mp4'));
 for(const button of document.querySelectorAll('[data-platform]'))button.addEventListener('click',()=>choosePlatform(button.dataset.platform));
@@ -104,7 +130,7 @@ $('videoMode').addEventListener('click',()=>chooseMode('videos'));
 $('playlistMode').addEventListener('click',()=>chooseMode('playlist'));
 $('sourceLink').addEventListener('click',()=>chooseSource('link'));
 $('sourceUpload').addEventListener('click',()=>chooseSource('upload'));
-$('example1').addEventListener('click',()=>{$('links').value=defaults.youtube;});
+$('example1').addEventListener('click',()=>{$('links').value='';});
 $('example2').addEventListener('click',()=>{$('links').value=example2;});
 $('links').addEventListener('input',()=>{state.drafts[state.platform]=$('links').value;$('diagnosticResult').classList.add('hidden');});
 $('diagnosticBtn').addEventListener('click',async()=>{
@@ -141,7 +167,7 @@ $('convertBtn').addEventListener('click',async()=>{
       const form = new FormData();form.append('file',$('uploadFile').files[0]);form.append('permission','true');form.append('media_format',state.media_format);form.append('quality',quality);
       result=await api('/api/upload',{method:'POST',body:form});
     }else{
-      result=await api('/api/jobs',{method:'POST',body:JSON.stringify({links:[$('links').value.trim()],permission:true,mode:state.mode,platform:state.platform,media_format:state.media_format,quality})});
+      result=await api('/api/jobs',{method:'POST',body:JSON.stringify({links:[$('links').value.trim()],permission:true,mode:state.mode,platform:state.platform,media_format:state.media_format,quality,engine:state.engine})});
     }
     await poll(result.job.id);
   }catch(e){message(e.message);$('progressPanel').classList.add('hidden');busy(false);}

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <meta name="theme-color" content="#090e1e">
+  <meta name="theme-color" content="#080d1b">
   <meta name="description" content="Wave Downloder: organize suas mídias próprias/autorizadas em MP3, MP4 ou ZIP de playlists.">
   <title>Wave Downloder — MP3 e MP4</title>
   <link rel="stylesheet" href="/static/style.css">
@@ -12,24 +12,24 @@
 <body>
   <div class="glow glow-1" aria-hidden="true"></div><div class="glow glow-2" aria-hidden="true"></div>
   <header class="header">
-    <a class="logo" href="/" aria-label="Página inicial Wave Downloder"><span class="logo-symbol" aria-hidden="true">≋</span><span>Wave <em>Downloder</em></span></a>
-    <div class="nav-caption">MEDIA STUDIO <span class="online-dot" aria-hidden="true"></span><button type="button" class="signout hidden" id="logoutBtn">Sair</button></div>
+    <a class="logo" href="/" aria-label="Página inicial Wave Downloder"><span class="logo-symbol" aria-hidden="true">≋</span><span>Wave <em>Downloder</em></span><span class="logo-pill">STUDIO</span></a>
+    <div class="nav-caption"><span class="nav-live"><span class="online-dot" aria-hidden="true"></span> STUDIO ONLINE</span><button type="button" class="signout hidden" id="logoutBtn">Sair</button></div>
   </header>
   <main>
     <section class="hero" aria-label="Apresentação">
       <span class="eyebrow"><span class="eyebrow-dot"></span> CONVERSOR MULTIPLATAFORMA</span>
-      <h1>Transforme em <span>MP3 ou MP4</span></h1>
-      <p>Escolha um formato, selecione a plataforma e organize seus conteúdos com permissão para download.</p>
+      <h1>Seu conteúdo.<br><span>Seu formato.</span></h1><div class="hero-mini-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+      <p>Um espaço para transformar vídeos e áudios autorizados em MP3 ou MP4 — direto no servidor ou usando o motor V4 do seu Windows.</p><div class="hero-benefits"><div><span>01</span><strong>Escolha MP3 ou MP4</strong></div><div><span>02</span><strong>Use um link ou arquivo próprio</strong></div><div><span>03</span><strong>Salve o resultado</strong></div></div>
     </section>
 
     <section class="panel converter" id="converter" aria-label="Configurações de conversão">
-      <div class="section-top"><div><span class="section-kicker">ETAPA 01 · FORMATO</span><h2>Primeiro, escolha MP3 ou MP4</h2></div><span class="section-icon" aria-hidden="true">◈</span></div>
+      <div class="section-top"><div><span class="section-kicker">SEU ESPAÇO DE CONVERSÃO</span><h2>Escolha o formato</h2></div><span class="section-icon" aria-hidden="true">◈</span></div>
       <div class="format-grid" role="group" aria-label="Formato do arquivo">
         <button type="button" id="formatMp3" class="format-choice selected" aria-pressed="true"><span class="format-logo">♫</span><span><strong>MP3</strong><small>Som e música</small></span></button>
         <button type="button" id="formatMp4" class="format-choice" aria-pressed="false"><span class="format-logo">▣</span><span><strong>MP4</strong><small>Vídeo com áudio</small></span></button>
       </div>
       <div class="form-separator"></div>
-      <div class="section-top"><div><span class="section-kicker">ETAPA 02 · ORIGEM</span><h2>Selecione a plataforma</h2></div></div>
+      <div class="section-top"><div><span class="section-kicker">01 · ORIGEM</span><h2>De onde vem o conteúdo?</h2></div></div>
       <div class="platform-grid" role="group" aria-label="Plataforma do conteúdo">
         <button type="button" class="platform-choice selected" data-platform="youtube" aria-pressed="true"><span class="platform-logo youtube">▶</span><strong>YouTube</strong></button>
         <button type="button" class="platform-choice" data-platform="spotify" aria-pressed="false"><span class="platform-logo spotify">◉</span><strong>Spotify</strong><small>Arquivo próprio</small></button>
@@ -38,7 +38,7 @@
       </div>
       <div class="platform-note hidden" id="spotifyNote" role="note">O Spotify não disponibiliza músicas de streaming para exportação em MP3 ou MP4 por terceiros. Nesta opção, você pode converter um <strong>arquivo seu</strong> que já possua legalmente, sem retirar proteção digital.</div>
       <div class="form-separator"></div>
-      <div class="section-top"><div><span class="section-kicker">ETAPA 03 · CONFIGURAÇÕES</span><h2>Configure seu download</h2></div></div>
+      <div class="section-top"><div><span class="section-kicker">02 · AJUSTES</span><h2>Personalize o arquivo</h2></div></div>
       <div class="main-form">
         <div class="source-switch" id="sourceSwitch" role="group" aria-label="Escolha a origem da mídia">
           <button type="button" id="sourceLink" class="source-option selected" aria-pressed="true">🔗 Usar link</button>
@@ -49,6 +49,21 @@
           Se isso acontecer, escolha <strong>Enviar arquivo próprio</strong> para converter um vídeo ou áudio que você já possui.
           Para baixar vídeos que você publicou, consulte o <a href="https://studio.youtube.com/" target="_blank" rel="noopener noreferrer">YouTube Studio</a>.
           Não envie senhas nem cookies da sua conta.
+        </div>
+
+        <div class="engine-section" id="engineSection">
+          <div class="label-line"><span class="engine-label">ONDE PROCESSAR?</span><span class="engine-tag">DOIS MODOS</span></div>
+          <div class="engine-grid" role="group" aria-label="Escolha onde processar">
+            <button type="button" class="engine-choice selected" id="engineServer" aria-pressed="true"><span class="engine-glyph">☁</span><strong>Servidor web</strong><small>Não precisa deixar o PC ligado. Sujeito a restrições da plataforma.</small></button>
+            <button type="button" class="engine-choice" id="enginePc" aria-pressed="false"><span class="engine-glyph">▣</span><strong>Meu Windows V4</strong><small>Use a conexão que funcionou no seu computador.</small></button>
+          </div>
+          <div id="bridgeCard" class="bridge-card hidden">
+            <div class="bridge-header"><div><strong>Conectar motor local</strong><p>Abra a ponte na pasta do Wave Downloder V4. O computador precisa estar ligado durante o processamento.</p></div><span id="bridgeStatus" class="bridge-indicator">Desconectado</span></div>
+            <button type="button" class="bridge-button" id="bridgePairBtn">Gerar código para conectar meu PC</button>
+            <div class="bridge-token-wrap hidden" id="bridgeTokenWrap"><div><span>CÓDIGO DE PAREAMENTO</span><code id="bridgeToken"></code></div><button type="button" id="bridgeCopyBtn" class="bridge-copy">Copiar</button></div>
+            <p class="bridge-help">Cole o código na janela <strong>INICIAR_PONTE_WEB.bat</strong>. Não compartilhe esse código: ele dá acesso às tarefas do computador.</p>
+            <p class="bridge-help" id="bridgeInfo">O status é atualizado enquanto esta página estiver aberta.</p>
+          </div>
         </div>
         <div class="mode-tiles" id="modeRow" role="group" aria-label="Tipo de mídia">
           <button type="button" id="videoMode" class="tile selected" aria-pressed="true"><span class="tile-icon">▶</span><strong>Baixar um vídeo</strong><small id="videoDescription">Em MP3</small></button>
@@ -99,7 +114,7 @@
     </section>
 
     <div class="details"><div class="detail"><span>♫</span><strong>MP3</strong><small>128, 192 e 320 kbps</small></div><div class="detail"><span>▣</span><strong>MP4</strong><small>360p, 720p e 1080p</small></div><div class="detail"><span>▤</span><strong>ZIP organizado</strong><small>Playlists do YouTube</small></div></div>
-    <footer>Wave Downloder • Apenas conteúdos próprios ou autorizados • Sem contornar DRM ou acesso privado</footer>
+    <footer><span>≋ Wave Downloder V5</span><span>Para conteúdos próprios ou com autorização · Acesso seguro · Sem contornar DRM</span></footer>
   </main>
 </body>
 </html>

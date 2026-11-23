@@ -55,6 +55,11 @@ login_attempts: dict[str, deque[float]] = {}
 recent_diagnostics: deque[float] = deque()
 diagnostic_busy = False
 
+# Ponte local opcional: um unico computador por vez, sem abrir portas no Windows.
+bridge_token: str | None = None
+bridge_seen_at: float = 0.0
+BRIDGE_HEARTBEAT_SECONDS = 60
+
 
 def safe_name(value: str, fallback: str = 'Mídia') -> str:
     value = re.sub(r'[\\/:*?"<>|\x00-\x1f\x7f]', ' ', str(value))
@@ -290,6 +295,133 @@ def me():
     return jsonify(authenticated=bool(session.get('authorized')), configured=bool(ACCESS_KEY))
 
 
+
+def _bridge_authorized() -> bool:
+    """O token de pareamento nunca aparece em logs e somente o agente o recebe."""
+    supplied = request.headers.get('X-Wave-Bridge', '')
+    with lock:
+        saved = bridge_token
+    return bool(saved and supplied and hmac.compare_digest(supplied, saved))
+
+
+@app.post('/api/bridge/pair')
+@requires_auth
+def bridge_pair():
+    """Um novo pareamento substitui o anterior. Sem senha do site no computador."""
+    global bridge_token, bridge_seen_at
+    with lock:
+        bridge_token = secrets.token_urlsafe(32)
+        bridge_seen_at = 0.0
+        token = bridge_token
+    return jsonify(token=token, message='Cole este codigo no INICIAR_PONTE_WEB.bat do seu Windows.')
+
+
+@app.get('/api/bridge/status')
+@requires_auth
+def bridge_status():
+    with lock:
+        connected = bool(bridge_token and time.time() - bridge_seen_at < BRIDGE_HEARTBEAT_SECONDS)
+    return jsonify(connected=connected, mode='local_windows', configured=bool(bridge_token))
+
+
+@app.post('/api/bridge/next')
+def bridge_next():
+    global bridge_seen_at
+    if not _bridge_authorized():
+        return jsonify(error='Pareamento invalido. Gere um novo codigo no site.'), 403
+    with lock:
+        bridge_seen_at = time.time()
+        pending = next((x for x in jobs.values()
+                        if x.get('engine') == 'bridge' and x['status'] == 'queued'), None)
+        if not pending:
+            return ('', 204)
+        pending.update(status='running', progress=6, message='Computador conectado. Preparando a midia...')
+        payload = {k:pending[k] for k in ('id','mode','media_format','platform','quality')}
+        payload['url'] = pending['links'][0]
+    return jsonify(job=payload)
+
+
+@app.post('/api/bridge/progress')
+def bridge_progress():
+    if not _bridge_authorized():
+        return jsonify(error='Nao autorizado.'), 403
+    data = request.get_json(silent=True) or {}
+    with lock:
+        job = jobs.get(str(data.get('id', '')))
+        if not job or job.get('engine') != 'bridge' or job['status'] != 'running':
+            return jsonify(error='Tarefa indisponivel.'), 404
+        try:
+            requested = int(data.get('progress', 10))
+        except (TypeError, ValueError):
+            requested = 10
+        job['progress'] = max(job['progress'], min(92, max(6, requested)))
+        job['message'] = 'Processando no seu computador...'
+    return jsonify(ok=True)
+
+
+@app.post('/api/bridge/failure')
+def bridge_failure():
+    global active_job
+    if not _bridge_authorized():
+        return jsonify(error='Nao autorizado.'), 403
+    data = request.get_json(silent=True) or {}
+    jid = str(data.get('id', ''))
+    with lock:
+        job = jobs.get(jid)
+        if not job or job.get('engine') != 'bridge' or job['status'] not in {'queued','running'}:
+            return jsonify(error='Tarefa nao encontrada.'), 404
+        job.update(status='error', error='A conversao falhou no computador. Confira a janela da ponte local.',
+                   message='Falha no computador.', finished_at=datetime.now(timezone.utc))
+        if active_job == jid:
+            active_job = None
+    shutil.rmtree(job['directory'], ignore_errors=True)
+    log_job(job)
+    return jsonify(ok=True)
+
+
+@app.post('/api/bridge/result')
+def bridge_result():
+    global active_job
+    if not _bridge_authorized():
+        return jsonify(error='Nao autorizado.'), 403
+    jid = request.form.get('id','')
+    upload = request.files.get('file')
+    with lock:
+        job = jobs.get(jid)
+        if not job or job.get('engine') != 'bridge' or job['status'] != 'running':
+            return jsonify(error='Tarefa nao encontrada.'), 404
+        expected = '.zip' if job['mode']=='playlist' else '.'+job['media_format']
+        name = safe_name(Path(upload.filename or '').stem) + expected if upload else ''
+        folder = Path(job['directory'])
+    if not upload or Path(upload.filename or '').suffix.lower() != expected:
+        return jsonify(error='Tipo de arquivo inesperado.'), 400
+    output = folder / name
+    try:
+        size = 0
+        with open(output, 'wb') as dest:
+            while True:
+                chunk = upload.stream.read(1024 * 1024)
+                if not chunk:
+                    break
+                size += len(chunk)
+                if size > MAX_SINGLE_BYTES:
+                    raise ValueError('Arquivo acima do limite de 85 MB.')
+                dest.write(chunk)
+        if size < 1:
+            raise ValueError('Arquivo vazio.')
+    except (OSError, ValueError) as exc:
+        output.unlink(missing_ok=True)
+        return jsonify(error=str(exc)), 413
+    with lock:
+        job.update(status='done', progress=100, message='Arquivo processado no Windows!',
+                   filename=output.name, final_path=str(output), output_count=1,
+                   finished_at=datetime.now(timezone.utc))
+        if active_job == jid:
+            active_job = None
+    log_job(job)
+    return jsonify(ok=True)
+
+
 @app.post('/api/login')
 def login():
     if not ACCESS_KEY:
@@ -355,6 +487,13 @@ def create_job():
     media_format = data.get('media_format')
     platform = data.get('platform')
     quality = str(data.get('quality'))
+    engine = data.get('engine', 'server')
+    if engine not in {'server', 'bridge'}:
+        return jsonify(error='Motor invalido.'), 400
+    if engine == 'bridge':
+        with lock:
+            if not bridge_token or time.time() - bridge_seen_at >= BRIDGE_HEARTBEAT_SECONDS:
+                return jsonify(error='O computador nao esta conectado. Abra INICIAR_PONTE_WEB.bat e conecte-o antes.'), 409
     if mode not in {'videos', 'playlist'} or media_format not in {'mp3', 'mp4'}:
         return jsonify(error='Escolha vídeo ou playlist e MP3 ou MP4.'), 400
     if platform not in {'youtube', 'instagram', 'tiktok', 'spotify'}:
@@ -375,8 +514,13 @@ def create_job():
         job = reserve_job(mode=mode, media_format=media_format, platform=platform, quality=quality, links=[link])
     except RuntimeError as exc:
         return jsonify(error=str(exc)), 429
+    job['engine'] = engine
     log_job(job)
-    threading.Thread(target=process_job, args=(job['id'],), daemon=True).start()
+    if engine == 'server':
+        threading.Thread(target=process_job, args=(job['id'],), daemon=True).start()
+    else:
+        with lock:
+            job['message'] = 'Aguardando o programa no Windows...'
     return jsonify(job=job_public(job)), 202
 
 
