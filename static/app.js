@@ -9,7 +9,7 @@ const state = {media_format: 'mp3', platform: 'youtube', mode: 'videos', source:
 const platformNames = {youtube:'YouTube',instagram:'Instagram',tiktok:'TikTok',spotify:'Spotify'};
 function message(text, id = 'notice', success = false) { const n=$(id); n.textContent=text;n.classList.remove('hidden');n.classList.toggle('success',success); }
 function clear(id='notice') { $(id).classList.add('hidden'); }
-function authorized(flag){ state.authorized=flag; $('loginCard').classList.toggle('hidden',flag);$('logoutBtn').classList.toggle('hidden',!flag);if(flag)updateBridgeStatus();else{state.bridgeConnected=false;$('bridgeTokenWrap').classList.add('hidden');}render(); }
+function authorized(flag){ state.authorized=flag; $('logoutBtn').classList.toggle('hidden',!flag);if(flag)updateBridgeStatus();else{state.bridgeConnected=false;$('bridgeTokenWrap').classList.add('hidden');}render(); }
 function render(){
   const uploadMode=state.source==='upload' || state.platform==='spotify';
   $('engineSection').classList.toggle('hidden', uploadMode);
@@ -20,6 +20,7 @@ function render(){
   $('engineServer').disabled=state.busy;
   $('enginePc').disabled=state.busy;
   $('bridgeCard').classList.toggle('hidden',uploadMode || state.engine!=='bridge');
+  $('loginCard').classList.toggle('hidden', state.authorized || uploadMode || state.engine!=='bridge');
   $('bridgeStatus').textContent=state.bridgeConnected?'Windows conectado':'Windows desconectado';
   $('bridgeStatus').classList.toggle('connected',state.bridgeConnected);
   $('bridgePairBtn').disabled=state.busy || !state.authorized;
@@ -62,7 +63,7 @@ function render(){
   $('linkType').textContent=state.mode==='playlist'?'PLAYLIST':'VÍDEO';
   $('examples').classList.toggle('hidden',state.platform!=='youtube');
   $('linkHelp').textContent=(state.mode==='playlist' ? 'Apenas playlist do YouTube, até '+(state.media_format==='mp3'?20:8)+' itens, dentro de ZIP.' : 'Vídeo público de sua autoria ou com autorização. Instagram/TikTok podem exigir login, que este site não fornece.') + (state.platform==='youtube' ? ' Atenção: o YouTube pode exigir verificação do servidor e bloquear a solicitação.' : '');
-  $('convertBtn').textContent=(!state.authorized?'🔒 Entrar para continuar':uploadMode?'↑ Converter meu arquivo em '+state.media_format.toUpperCase():state.engine==='bridge'?'↓ Processar no meu Windows V4':state.mode==='playlist'?'↓ Baixar playlist em ZIP':'↓ Baixar '+state.media_format.toUpperCase());
+  $('convertBtn').textContent=(uploadMode?'↑ Converter meu arquivo em '+state.media_format.toUpperCase():state.engine==='bridge'&&!state.authorized?'🔒 Conectar meu Windows (admin)':state.engine==='bridge'?'↓ Processar no meu Windows V4':state.mode==='playlist'?'↓ Baixar playlist em ZIP':'↓ Baixar '+state.media_format.toUpperCase());
   $('convertBtn').disabled=state.busy || state.diagnosticBusy;
 }
 function chooseEngine(engine){if(state.busy)return;state.engine=engine;clear();render();}
@@ -90,7 +91,7 @@ async function api(path,options={}){
   if (!response.ok) throw Error(result.error||`Erro HTTP ${response.status}`);
   return result;
 }
-async function init(){try{const r=await api('/api/me');authorized(r.authenticated);if(!r.configured)message('A senha de acesso precisa ser definida no painel do Render.','loginNotice');}catch(e){message('Servidor indisponível: '+e.message,'loginNotice');}}
+async function init(){try{const r=await api('/api/me');authorized(r.authenticated);}catch(e){message('Servidor indisponível: '+e.message);}}
 function busy(flag){state.busy=flag;render();}
 async function poll(id){
   try{
@@ -113,7 +114,7 @@ $('loginForm').addEventListener('submit',async e=>{
   try{await api('/api/login',{method:'POST',body:JSON.stringify({password:$('sitePassword').value})});$('sitePassword').value='';authorized(true);}
   catch(e){message(e.message,'loginNotice');}
 });
-$('logoutBtn').addEventListener('click',async()=>{if(state.timer)clearTimeout(state.timer);try{await api('/api/logout',{method:'POST'});}catch(_){}authorized(false);});
+$('logoutBtn').addEventListener('click',async()=>{if(state.timer)clearTimeout(state.timer);try{await api('/api/logout',{method:'POST'});}catch(_){}state.engine='server';authorized(false);});
 $('engineServer').addEventListener('click',()=>chooseEngine('server'));
 $('enginePc').addEventListener('click',()=>chooseEngine('bridge'));
 $('bridgePairBtn').addEventListener('click',async()=>{
@@ -135,7 +136,6 @@ $('example2').addEventListener('click',()=>{$('links').value=example2;});
 $('links').addEventListener('input',()=>{state.drafts[state.platform]=$('links').value;$('diagnosticResult').classList.add('hidden');});
 $('diagnosticBtn').addEventListener('click',async()=>{
   if(state.busy || state.diagnosticBusy || state.platform!=='youtube' || state.source!=='link')return;
-  if(!state.authorized){$('loginCard').scrollIntoView({behavior:'smooth',block:'center'});return;}
   if(!$('permission').checked)return message('Confirme que tem autorização para consultar este vídeo.');
   if(!$('links').value.trim())return message('Cole um link válido do YouTube.');
   state.diagnosticBusy=true;render();
@@ -152,7 +152,7 @@ $('diagnosticBtn').addEventListener('click',async()=>{
 });
 $('convertBtn').addEventListener('click',async()=>{
   if(state.busy)return;
-  if(!state.authorized){$('loginCard').scrollIntoView({behavior:'smooth',block:'center'});return;}
+  if(state.engine==='bridge' && !state.authorized && state.source==='link' && state.platform!=='spotify'){$('loginCard').scrollIntoView({behavior:'smooth',block:'center'});return;}
   clear();
   if(!$('permission').checked)return message('Confirme que você tem permissão para obter a mídia.');
   const uploadMode=state.source==='upload' || state.platform==='spotify';

@@ -13,16 +13,16 @@
   <div class="glow glow-1" aria-hidden="true"></div><div class="glow glow-2" aria-hidden="true"></div>
   <header class="header">
     <a class="logo" href="/" aria-label="Página inicial Wave Downloder"><span class="logo-symbol" aria-hidden="true">≋</span><span>Wave <em>Downloder</em></span><span class="logo-pill">STUDIO</span></a>
-    <div class="nav-caption"><span class="nav-live"><span class="online-dot" aria-hidden="true"></span> STUDIO ONLINE</span><button type="button" class="signout hidden" id="logoutBtn">Sair</button></div>
+    <div class="nav-caption"><span class="nav-live"><span class="online-dot" aria-hidden="true"></span> STUDIO ONLINE</span><button type="button" class="signout hidden" id="logoutBtn">Sair do modo admin</button></div>
   </header>
   <main>
     <section class="hero" aria-label="Apresentação">
       <span class="eyebrow"><span class="eyebrow-dot"></span> CONVERSOR MULTIPLATAFORMA</span>
       <h1>Seu conteúdo.<br><span>Seu formato.</span></h1><div class="hero-mini-wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-      <p>Um espaço para transformar vídeos e áudios autorizados em MP3 ou MP4 — direto no servidor ou usando o motor V4 do seu Windows.</p><div class="hero-benefits"><div><span>01</span><strong>Escolha MP3 ou MP4</strong></div><div><span>02</span><strong>Use um link ou arquivo próprio</strong></div><div><span>03</span><strong>Salve o resultado</strong></div></div>
+      <p>Converta vídeos e áudios próprios ou autorizados em MP3 ou MP4, sem cadastro e sem anúncios de instalação. O modo Windows é reservado ao administrador.</p><div class="hero-benefits"><div><span>01</span><strong>Escolha MP3 ou MP4</strong></div><div><span>02</span><strong>Use um link ou arquivo próprio</strong></div><div><span>03</span><strong>Salve o resultado</strong></div></div>
     </section>
 
-    <section class="panel converter" id="converter" aria-label="Configurações de conversão">
+    <section class="panel converter" id="converter" aria-label="Configurações de conversão"><p class="public-access-note">✓ Acesso público: sem cadastro ou senha para usar o servidor.</p>
       <div class="section-top"><div><span class="section-kicker">SEU ESPAÇO DE CONVERSÃO</span><h2>Escolha o formato</h2></div><span class="section-icon" aria-hidden="true">◈</span></div>
       <div class="format-grid" role="group" aria-label="Formato do arquivo">
         <button type="button" id="formatMp3" class="format-choice selected" aria-pressed="true"><span class="format-logo">♫</span><span><strong>MP3</strong><small>Som e música</small></span></button>
@@ -61,7 +61,7 @@
             <div class="bridge-header"><div><strong>Conectar motor local</strong><p>Abra a ponte na pasta do Wave Downloder V4. O computador precisa estar ligado durante o processamento.</p></div><span id="bridgeStatus" class="bridge-indicator">Desconectado</span></div>
             <button type="button" class="bridge-button" id="bridgePairBtn">Gerar código para conectar meu PC</button>
             <div class="bridge-token-wrap hidden" id="bridgeTokenWrap"><div><span>CÓDIGO DE PAREAMENTO</span><code id="bridgeToken"></code></div><button type="button" id="bridgeCopyBtn" class="bridge-copy">Copiar</button></div>
-            <p class="bridge-help">Cole o código na janela <strong>INICIAR_PONTE_WEB.bat</strong>. Não compartilhe esse código: ele dá acesso às tarefas do computador.</p>
+            <p class="bridge-help">Esta opção exige acesso administrativo. Cole o código na janela <strong>INICIAR_PONTE_WEB.bat</strong>. Não compartilhe esse código.</p>
             <p class="bridge-help" id="bridgeInfo">O status é atualizado enquanto esta página estiver aberta.</p>
           </div>
         </div>
@@ -107,14 +107,14 @@
       </div>
     </section>
 
-    <section class="panel auth-panel" id="loginCard" aria-label="Entrar para baixar">
-      <div class="panel-head"><span class="panel-icon" aria-hidden="true">🔒</span><div><h2>Área protegida</h2><p>O site é público, mas para processar arquivos você precisa da senha de acesso.</p></div></div>
-      <form id="loginForm"><label for="sitePassword">Senha de acesso</label><div class="login-row"><input type="password" id="sitePassword" autocomplete="current-password" placeholder="Senha do site" minlength="8" maxlength="200" required><button class="action" type="submit">Entrar</button></div></form>
+    <section class="panel auth-panel hidden" id="loginCard" aria-label="Acesso administrativo ao Windows">
+      <div class="panel-head"><span class="panel-icon" aria-hidden="true">🔒</span><div><h2>Conectar seu Windows</h2><p>As conversões pelo servidor são livres, sem senha. O acesso de administrador só é necessário para conectar seu computador à ponte local.</p></div></div>
+      <form id="loginForm"><label for="sitePassword">Senha do administrador (somente para o motor Windows)</label><div class="login-row"><input type="password" id="sitePassword" autocomplete="current-password" placeholder="Senha do site" minlength="8" maxlength="200" required><button class="action" type="submit">Entrar</button></div></form>
       <div id="loginNotice" class="notice hidden" role="status"></div>
     </section>
 
     <div class="details"><div class="detail"><span>♫</span><strong>MP3</strong><small>128, 192 e 320 kbps</small></div><div class="detail"><span>▣</span><strong>MP4</strong><small>360p, 720p e 1080p</small></div><div class="detail"><span>▤</span><strong>ZIP organizado</strong><small>Playlists do YouTube</small></div></div>
-    <footer><span>≋ Wave Downloder V5</span><span>Para conteúdos próprios ou com autorização · Acesso seguro · Sem contornar DRM</span></footer>
+    <footer><span>≋ Wave Downloder V5</span><span>Sem login para visitantes · Arquivos MP3/MP4/ZIP · Conteúdo próprio ou autorizado · Sem DRM</span></footer>
   </main>
 </body>
 </html>

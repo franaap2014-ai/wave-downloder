@@ -2,6 +2,7 @@
 import io
 import shutil
 import unittest
+import unittest.mock
 import app as wave
 
 class BridgeTests(unittest.TestCase):
@@ -13,6 +14,8 @@ class BridgeTests(unittest.TestCase):
         wave.bridge_seen_at = 0.0
         wave.active_job = None
         wave.recent_jobs.clear()
+        wave.recent_jobs_by_ip.clear()
+        wave.recent_jobs_by_client.clear()
         wave.login_attempts.clear()
         with wave.lock:
             for x in wave.jobs.values():
@@ -85,5 +88,66 @@ class BridgeTests(unittest.TestCase):
             'id':jid,'file':(io.BytesIO(b'fake'), 'bad.mp4')
         },content_type='multipart/form-data')
         self.assertEqual(response.status_code,400)
+class PublicTests(unittest.TestCase):
+    def setUp(self):
+        wave.app.config.update(TESTING=True)
+        wave.ACCESS_KEY = 'private-admin-password'
+        wave.DATABASE_URL = ''
+        wave.bridge_token = None
+        wave.bridge_seen_at = 0.0
+        wave.active_job = None
+        wave.recent_jobs.clear()
+        wave.recent_jobs_by_ip.clear()
+        wave.recent_jobs_by_client.clear()
+        wave.login_attempts.clear()
+        with wave.lock:
+            for job in wave.jobs.values():
+                shutil.rmtree(job['directory'], ignore_errors=True)
+            wave.jobs.clear()
+        self.client = wave.app.test_client()
+
+    def payload(self, engine='server'):
+        return {
+            'links':['https://www.youtube.com/watch?v=qq-RGFyaq0U'],
+            'permission':True,'mode':'videos','platform':'youtube',
+            'media_format':'mp3','quality':'192','engine':engine
+        }
+
+    def test_no_login_for_public_site(self):
+        me=self.client.get('/api/me')
+        self.assertEqual(me.status_code,200)
+        self.assertTrue(me.get_json()['public_access'])
+        self.assertFalse(me.get_json()['authenticated'])
+        with unittest.mock.patch.object(wave.threading,'Thread'):
+            r=self.client.post('/api/jobs',json=self.payload())
+        self.assertEqual(r.status_code,202,r.get_json())
+        self.assertEqual(r.get_json()['job']['status'],'queued')
+
+    def test_other_client_cannot_see_or_download_job(self):
+        with unittest.mock.patch.object(wave.threading,'Thread'):
+            r=self.client.post('/api/jobs',json=self.payload())
+        jid=r.get_json()['job']['id']
+        visitor=wave.app.test_client()
+        self.assertEqual(visitor.get('/api/jobs/'+jid).status_code,404)
+        self.assertEqual(visitor.get('/api/jobs/'+jid+'/download').status_code,404)
+        self.assertEqual(self.client.get('/api/jobs/'+jid).status_code,200)
+
+    def test_bridge_cannot_be_used_by_visitor(self):
+        wave.bridge_token='some-agent-token'
+        wave.bridge_seen_at=wave.time.time()
+        r=self.client.post('/api/jobs',json=self.payload('bridge'))
+        self.assertEqual(r.status_code,403)
+        self.assertEqual(self.client.post('/api/bridge/pair').status_code,401)
+
+    def test_foreign_origin_rejected(self):
+        r=self.client.post('/api/jobs',json=self.payload(),headers={'Origin':'https://evil.invalid'})
+        self.assertEqual(r.status_code,403)
+
+    def test_security_headers(self):
+        r=self.client.get('/')
+        self.assertEqual(r.headers['X-Content-Type-Options'],'nosniff')
+        self.assertIn('frame-ancestors',r.headers['Content-Security-Policy'])
+
 if __name__=='__main__':
     unittest.main()
+

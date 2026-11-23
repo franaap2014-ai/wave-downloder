@@ -51,6 +51,9 @@ jobs: dict[str, dict] = {}
 lock = threading.RLock()
 active_job: str | None = None
 recent_jobs: deque[float] = deque()
+# Limites anonimos por visitante e IP, somados ao teto global.
+recent_jobs_by_ip: dict[str, deque[float]] = {}
+recent_jobs_by_client: dict[str, deque[float]] = {}
 login_attempts: dict[str, deque[float]] = {}
 recent_diagnostics: deque[float] = deque()
 diagnostic_busy = False
@@ -204,6 +207,50 @@ def log_job(job: dict) -> None:
         app.logger.warning('Histórico do Neon indisponível (%s)', type(exc).__name__)
 
 
+def ensure_client_id() -> str:
+    """Identidade anonima assinada pelo cookie Flask, sem cadastro."""
+    cid = session.get('client_id')
+    if not isinstance(cid, str) or len(cid) < 32:
+        cid = secrets.token_urlsafe(24)
+        session['client_id'] = cid
+    return cid
+
+
+def own_job(job: dict) -> bool:
+    """Cada visitante acessa apenas seus resultados."""
+    cid = session.get('client_id')
+    return bool(session.get('authorized') or (cid and job.get('owner_id') == cid))
+
+
+@app.after_request
+def security_headers(response):
+    response.headers['X-Content-Type-Options'] = 'nosniff'
+    response.headers['X-Frame-Options'] = 'DENY'
+    response.headers['Referrer-Policy'] = 'no-referrer'
+    response.headers['Content-Security-Policy'] = (
+        "default-src 'self'; script-src 'self'; style-src 'self'; "
+        "img-src 'self' data:; connect-src 'self'; form-action 'self'; "
+        "base-uri 'self'; frame-ancestors 'none'; object-src 'none'"
+    )
+    if request.path.startswith('/api/'):
+        response.cache_control.no_store = True
+    return response
+
+
+@app.before_request
+def check_browser_origin():
+    """Nega alteracoes iniciadas em outra origem no navegador."""
+    if request.method in {'POST', 'PUT', 'PATCH', 'DELETE'} and request.path.startswith('/api/'):
+        origin = request.headers.get('Origin')
+        if origin:
+            try:
+                u = urlparse(origin)
+                if u.scheme not in {'http','https'} or u.netloc.lower() != request.host.lower():
+                    return jsonify(error='Solicitacao de outra origem recusada.'), 403
+            except ValueError:
+                return jsonify(error='Origem invalida.'), 403
+
+
 def prune() -> None:
     cutoff = time.time() - JOB_TTL_SECONDS
     with lock:
@@ -211,21 +258,27 @@ def prune() -> None:
             if job['created_ts'] < cutoff and job['status'] in {'done', 'error'}:
                 shutil.rmtree(job['directory'], ignore_errors=True)
                 del jobs[jid]
-        while recent_jobs and recent_jobs[0] < time.time() - 3600:
+        now = time.time()
+        while recent_jobs and recent_jobs[0] < now - 3600:
             recent_jobs.popleft()
+        for bucket in (recent_jobs_by_ip, recent_jobs_by_client):
+            for key, attempts in list(bucket.items()):
+                while attempts and attempts[0] < now - 3600:
+                    attempts.popleft()
+                if not attempts:
+                    del bucket[key]
 
 
 def requires_auth(fn):
     @wraps(fn)
     def wrapper(*args, **kwargs):
         if not session.get('authorized'):
-            return jsonify(error='Faça login para acessar a conversão.'), 401
+            return jsonify(error='Esta função é exclusiva do administrador.'), 401
         return fn(*args, **kwargs)
     return wrapper
 
 
 @app.post('/api/diagnose')
-@requires_auth
 def diagnose_youtube():
     """Sonda metadados de UM vídeo público por vez; não baixa nem muda de cliente."""
     global diagnostic_busy
@@ -281,6 +334,7 @@ def diagnose_youtube():
 
 @app.get('/')
 def index():
+    ensure_client_id()
     return render_template('index.html')
 
 
@@ -292,7 +346,8 @@ def health():
 
 @app.get('/api/me')
 def me():
-    return jsonify(authenticated=bool(session.get('authorized')), configured=bool(ACCESS_KEY))
+    ensure_client_id()
+    return jsonify(public_access=True, authenticated=bool(session.get('authorized')), configured=bool(ACCESS_KEY))
 
 
 
@@ -438,7 +493,9 @@ def login():
     candidate = str(data.get('password', ''))[:200]
     if not hmac.compare_digest(candidate, ACCESS_KEY):
         return jsonify(error='Senha incorreta.'), 401
+    cid = ensure_client_id()
     session.clear()
+    session['client_id'] = cid
     session.permanent = True
     session['authorized'] = True
     return jsonify(ok=True)
@@ -456,11 +513,20 @@ def job_public(job: dict) -> dict:
 
 def reserve_job(*, mode: str, media_format: str, platform: str, quality: str, links: list[str], source_name: str = '') -> dict:
     global active_job
+    cid = ensure_client_id()
+    ip = request.remote_addr or 'unknown'
+    now = time.time()
     with lock:
         if active_job and jobs.get(active_job, {}).get('status') in {'queued', 'running'}:
             raise RuntimeError('Outro arquivo está sendo preparado. Tente novamente após concluir.')
         if len(recent_jobs) >= 8:
             raise RuntimeError('Limite de oito tarefas por hora atingido neste servidor.')
+        for bucket, key, limit in ((recent_jobs_by_ip, ip, 4), (recent_jobs_by_client, cid, 3)):
+            attempts = bucket.setdefault(key, deque())
+            while attempts and attempts[0] < now - 3600:
+                attempts.popleft()
+            if len(attempts) >= limit:
+                raise RuntimeError('Limite temporario de conversoes por visitante. Tente mais tarde.')
         jid = str(uuid.uuid4())
         directory = str(BASE / jid)
         Path(directory).mkdir(parents=True, exist_ok=True)
@@ -468,16 +534,17 @@ def reserve_job(*, mode: str, media_format: str, platform: str, quality: str, li
                    media_format=media_format, platform=platform, quality=quality,
                    progress=0, message='Aguardando...', output_count=0,
                    source_count=1 if mode != 'playlist' else (MAX_PLAYLIST_MP3 if media_format == 'mp3' else MAX_PLAYLIST_MP4),
-                   filename='', created_ts=time.time(), directory=directory,
+                   filename='', owner_id=cid, created_ts=time.time(), directory=directory,
                    final_path='', finished_at=None, error=None, source_name=source_name)
         jobs[jid] = job
         active_job = jid
-        recent_jobs.append(time.time())
+        recent_jobs.append(now)
+        recent_jobs_by_ip.setdefault(ip, deque()).append(now)
+        recent_jobs_by_client.setdefault(cid, deque()).append(now)
     return job
 
 
 @app.post('/api/jobs')
-@requires_auth
 def create_job():
     prune()
     data = request.get_json(silent=True) or {}
@@ -491,6 +558,8 @@ def create_job():
     if engine not in {'server', 'bridge'}:
         return jsonify(error='Motor invalido.'), 400
     if engine == 'bridge':
+        if not session.get('authorized'):
+            return jsonify(error='O motor Windows é exclusivo do administrador. Para visitantes, selecione Servidor web.'), 403
         with lock:
             if not bridge_token or time.time() - bridge_seen_at >= BRIDGE_HEARTBEAT_SECONDS:
                 return jsonify(error='O computador nao esta conectado. Abra INICIAR_PONTE_WEB.bat e conecte-o antes.'), 409
@@ -525,7 +594,6 @@ def create_job():
 
 
 @app.post('/api/upload')
-@requires_auth
 def convert_own_file():
     """Legitimate alternative to exporting media from Spotify streaming."""
     prune()
@@ -717,12 +785,11 @@ def convert_local(job: dict, folder: Path) -> None:
 
 
 @app.get('/api/jobs/<jid>')
-@requires_auth
 def get_job(jid: str):
     prune()
     with lock:
         job = jobs.get(jid)
-        if not job:
+        if not job or not own_job(job):
             return jsonify(error='Tarefa não encontrada ou expirada.'), 404
         public = job_public(job)
         if job['status'] == 'error':
@@ -731,12 +798,11 @@ def get_job(jid: str):
 
 
 @app.get('/api/jobs/<jid>/download')
-@requires_auth
 def download(jid: str):
     prune()
     with lock:
         job = jobs.get(jid)
-        if not job or job['status'] != 'done':
+        if not job or not own_job(job) or job['status'] != 'done':
             return jsonify(error='Arquivo não está pronto ou expirou.'), 404
         path = Path(job['final_path'])
     if not path.is_file():
